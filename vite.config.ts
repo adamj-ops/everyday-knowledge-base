@@ -33,7 +33,7 @@ export default () =>
       port: 3001,
       host: true,
       https: httpsConfig,
-      allowedHosts: host ? [host] : undefined,
+      allowedHosts: host ? [host, "local.outline.dev", "localhost"] : ["local.outline.dev", "localhost"],
       cors: true,
       fs:
         environment.NODE_ENV === "development"

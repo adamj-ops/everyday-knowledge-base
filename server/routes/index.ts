@@ -15,6 +15,7 @@ import { Integration } from "@server/models";
 import { opensearchResponse } from "@server/utils/opensearch";
 import { getTeamFromContext } from "@server/utils/passport";
 import { robotsResponse } from "@server/utils/robots";
+import fetch from "@server/utils/fetch";
 import apexRedirect from "../middlewares/apexRedirect";
 import { renderApp, renderShare } from "./app";
 import { renderEmbed } from "./embeds";
@@ -85,6 +86,44 @@ if (env.isProduction) {
       }
 
       throw err;
+    }
+  });
+} else {
+  // In development, proxy static requests to Vite dev server
+  router.all("/static/*", async (ctx) => {
+    const viteHost = env.URL.replace(`:${env.PORT}`, ":3001");
+    // Replace localhost and local.outline.dev with 127.0.0.1 to avoid DNS lookup restrictions in fetch utility
+    const viteHostIp = viteHost.replace(/localhost|local\.outline\.dev/g, "127.0.0.1");
+    // Keep /static/ prefix when forwarding to Vite (Vite's base is /static/)
+    const targetUrl = `${viteHostIp}${ctx.path}${ctx.search}`;
+
+    try {
+      const response = await fetch(targetUrl, {
+        method: ctx.method,
+        allowPrivateIPAddress: true,
+        headers: {
+          ...Object.fromEntries(
+            Object.entries(ctx.headers).filter(([key]) => 
+              !["host", "connection"].includes(key.toLowerCase())
+            )
+          ),
+          host: new URL(viteHost).host,
+        },
+      });
+
+      ctx.status = response.status;
+      
+      // Copy response headers
+      response.headers.forEach((value, key) => {
+        ctx.set(key, value);
+      });
+
+      // Set response body
+      const arrayBuffer = await response.arrayBuffer();
+      ctx.body = Buffer.from(arrayBuffer);
+    } catch (err) {
+      ctx.status = 502;
+      ctx.body = "Proxy error: " + (err instanceof Error ? err.message : String(err));
     }
   });
 }

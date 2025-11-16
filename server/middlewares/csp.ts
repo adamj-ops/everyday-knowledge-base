@@ -23,6 +23,8 @@ export default function createCSPMiddleware() {
   if (!env.isProduction) {
     scriptSrc.push(env.URL.replace(`:${env.PORT}`, ":3001"));
     scriptSrc.push("localhost:3001");
+    // Also allow scripts from the main server (for proxied static assets)
+    scriptSrc.push(env.URL);
   } else {
     scriptSrc.push(env.URL);
   }
